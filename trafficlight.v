@@ -1,100 +1,74 @@
-module traffic_light (clk, Sa, Sb, Ra, Rb, Ga, Gb, Ya, Yb);
-input clk;
-input Sa;
-input Sb;
-inout Ra;
-inout Rb;
-inout Ga;
-inout Gb; 
-inout Ya;
-inout Yb;
-reg Ra_tmp;
-reg Rb_tmp;
-reg Ga_tmp;
-reg Gb_tmp;
-reg Ya_tmp;
-reg Yb_tmp;
-reg[3:0] state;
-reg[3:0] nextstate;
-parameter[1:0] R = 0;
-parameter[1:0] Y = 1;
-parameter[1:0] G = 2;
-wire[1:0] lightA;
-wire[1:0] lightB;
-assign Ra = Ra_tmp;
-assign Rb = Rb_tmp;
-assign Ga = Ga_tmp;
-assign Gb = Gb_tmp;
-assign Ya = Ya_tmp;
-assign Yb = Yb_tmp;
-initial
-begin
- state = 0;
-end
-always @(state or Sa or Sb)
-begin
- Ra_tmp = 1'b0 ;
- Rb_tmp = 1'b0 ;
- Ga_tmp = 1'b0 ;
- Gb_tmp = 1'b0 ;
- Ya_tmp = 1'b0 ;
- Yb_tmp = 1'b0 ;
- nextstate = 0;
- case (state)
- 0, 1, 2, 3, 4 :
- begin Ga_tmp = 1'b1 ;
- Rb_tmp = 1'b1 ;
- nextstate = state + 1 ;
- end
- 5 :
- begin
- Ga_tmp = 1'b1 ;
- Rb_tmp = 1'b1 ;
- if (Sb == 1'b1)
- begin
- nextstate = 6 ;
- end
- else
- begin
- nextstate = 5 ;
- end 
- end
- 6 :
- begin
- Ya_tmp = 1'b1 ;
- Rb_tmp = 1'b1 ;
- nextstate = 7 ;
- end
- 7, 8, 9, 10 :
- begin
- Ra_tmp = 1'b1 ;
- Gb_tmp = 1'b1 ;
- nextstate = state + 1 ;
- end
- 11 :
- begin
- Ra_tmp = 1'b1 ;
- Gb_tmp = 1'b1 ;
- if (Sa == 1'b1 | Sb == 1'b0)
- begin
- nextstate = 12 ;
- end 
- else
- begin
- nextstate = 11 ;
- end 
- end
- 12 :
- begin
- Ra_tmp = 1'b1 ;
- Yb_tmp = 1'b1 ;
- nextstate = 0 ;
- end
- endcase
-end always @(posedge clk)
-begin
- state <= nextstate ;
-end
-assign lightA = (Ra==1'b1) ? R : (Ya==1'b1) ? Y : (Ga==1'b1) ? G : lightA;
-assign lightB = (Rb==1'b1) ? R : (Yb==1'b1) ? Y : (Gb==1'b1) ? G : lightB;
+module traffic_light_controller (
+    input clk,
+    input reset,
+    input Sa,  // Sensor for direction A
+    input Sb,  // Sensor for direction B
+    output reg Ra, // Red light for direction A
+    output reg Ga, // Green light for direction A
+    output reg Ya, // Yellow light for direction A
+    output reg Rb, // Red light for direction B
+    output reg Gb, // Green light for direction B
+    output reg Yb  // Yellow light for direction B
+);
+
+    typedef enum logic [3:0] {
+        STATE_A_GREEN = 4'd0,
+        STATE_A_YELLOW = 4'd1,
+        STATE_B_GREEN = 4'd2,
+        STATE_B_YELLOW = 4'd3
+    } state_t;
+
+    state_t state, next_state;
+
+    // logic
+    always_ff @(posedge clk or posedge reset) begin
+        if (reset)
+            state <= STATE_A_GREEN;
+        else
+            state <= next_state;
+    end
+
+    // Next state logic
+    always_comb begin
+        // Default outputs
+        Ra = 0;
+        Ga = 0;
+        Ya = 0;
+        Rb = 0;
+        Gb = 0;
+        Yb = 0;
+        
+        case (state)
+            STATE_A_GREEN: begin
+                Ga = 1;
+                Rb = 1;
+                if (Sb)
+                    next_state = STATE_A_YELLOW;
+                else
+                    next_state = STATE_A_GREEN;
+            end
+            STATE_A_YELLOW: begin
+                Ya = 1;
+                Rb = 1;
+                next_state = STATE_B_GREEN;
+            end
+            STATE_B_GREEN: begin
+                Ra = 1;
+                Gb = 1;
+                if (Sa)
+                    next_state = STATE_B_YELLOW;
+                else
+                    next_state = STATE_B_GREEN;
+            end
+            STATE_B_YELLOW: begin
+                Ra = 1;
+                Yb = 1;
+                next_state = STATE_A_GREEN;
+            end
+            default: begin
+                next_state = STATE_A_GREEN;
+            end
+        endcase
+    end
+
 endmodule
